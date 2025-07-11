@@ -56,7 +56,8 @@ void _register() async{
       ),
     );
  }on FirebaseAuthException catch (e){
-    print(e.message)
+    // ignore: avoid_print
+    print(e.message);
  }
   }
 }
