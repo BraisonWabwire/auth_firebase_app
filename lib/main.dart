@@ -1,8 +1,18 @@
 import 'package:auth_firebase_app/app/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
 
-void main() {
+// Initialize ValueNotifier for AuthService
+ValueNotifier<AuthService> authService = ValueNotifier(AuthService());
+
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); 
+     await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform, // Generated options
+  );
   runApp(const MyApp());
 }
 
