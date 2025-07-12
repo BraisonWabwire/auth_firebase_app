@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 
 // Initialize ValueNotifier for AuthService
-ValueNotifier<AuthService> authService = ValueNotifier(AuthService());
+// ValueNotifier<AuthService> authService = ValueNotifier(AuthService());
 
 
 void main() async {
@@ -22,6 +22,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Register Page',
       theme: ThemeData(
         primarySwatch: Colors.blue,
