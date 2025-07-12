@@ -1,6 +1,7 @@
 import 'package:auth_firebase_app/app/auth_service.dart';
+import 'package:auth_firebase_app/app/profile_page.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // For timestamps
+import 'package:intl/intl.dart';
 
 class AppNavigationLayout extends StatefulWidget {
   const AppNavigationLayout({super.key});
@@ -10,30 +11,26 @@ class AppNavigationLayout extends StatefulWidget {
 }
 
 class _AppNavigationLayoutState extends State<AppNavigationLayout>
-    with TickerProviderStateMixin { // Changed to TickerProviderStateMixin
+    with TickerProviderStateMixin {
   final _messageController = TextEditingController();
   final List<Map<String, dynamic>> _messages = [];
   bool _isBotTyping = false;
   late AnimationController _typingAnimationController;
   late AnimationController _sendButtonAnimationController;
   final ScrollController _scrollController = ScrollController();
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // Initialize animation controller for typing indicator
     _typingAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
-
-    // Initialize animation controller for send button
     _sendButtonAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-
-    // Add initial bot message
     final user = authService.value.currentUser;
     _messages.add({
       'text': 'Hello${user?.email != null ? ', ${user!.email}' : ''}! How can I assist you today?',
@@ -53,7 +50,6 @@ class _AppNavigationLayoutState extends State<AppNavigationLayout>
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
-
     setState(() {
       _messages.add({
         'text': _messageController.text.trim(),
@@ -62,11 +58,8 @@ class _AppNavigationLayoutState extends State<AppNavigationLayout>
       });
       _isBotTyping = true;
     });
-
     _messageController.clear();
     _scrollToBottom();
-
-    // Simulate bot response after a delay
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         setState(() {
@@ -94,12 +87,18 @@ class _AppNavigationLayoutState extends State<AppNavigationLayout>
     });
   }
 
+  void _onNavBarTap(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = authService.value.currentUser;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chatbot'),
+        title: Text(_selectedIndex == 0 ? 'Chatbot' : 'Profile'),
         elevation: 2,
         actions: [
           IconButton(
@@ -116,39 +115,7 @@ class _AppNavigationLayoutState extends State<AppNavigationLayout>
           ),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade100, Colors.white],
-          ),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16.0),
-                itemCount: _messages.length + (_isBotTyping ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (_isBotTyping && index == _messages.length) {
-                    return _buildTypingIndicator();
-                  }
-                  final message = _messages[index];
-                  return _buildMessageBubble(
-                    message['text'],
-                    message['isUser'],
-                    message['timestamp'],
-                    index,
-                  );
-                },
-              ),
-            ),
-            _buildInputArea(),
-          ],
-        ),
-      ),
+      body: _selectedIndex == 0 ? _buildChatView() : const ProfilePage(),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
@@ -160,27 +127,55 @@ class _AppNavigationLayoutState extends State<AppNavigationLayout>
             label: 'Profile',
           ),
         ],
-        currentIndex: 0,
+        currentIndex: _selectedIndex,
         selectedItemColor: Colors.blue,
-        onTap: (index) {
-          if (index == 1) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile page not implemented yet')),
-            );
-          }
-        },
+        onTap: _onNavBarTap,
+      ),
+    );
+  }
+
+  Widget _buildChatView() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.blue.shade100, Colors.white],
+        ),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _messages.length + (_isBotTyping ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (_isBotTyping && index == _messages.length) {
+                  return _buildTypingIndicator();
+                }
+                final message = _messages[index];
+                return _buildMessageBubble(
+                  message['text'],
+                  message['isUser'],
+                  message['timestamp'],
+                  index,
+                );
+              },
+            ),
+          ),
+          _buildInputArea(),
+        ],
       ),
     );
   }
 
   Widget _buildMessageBubble(
       String text, bool isUser, DateTime timestamp, int index) {
-    // Create a unique AnimationController for each message
     final animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     )..forward();
-
     return FadeTransition(
       opacity: CurvedAnimation(
         parent: animationController,
