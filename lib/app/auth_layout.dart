@@ -2,7 +2,6 @@ import 'package:auth_firebase_app/app/appNavigationLayout.dart';
 import 'package:auth_firebase_app/app/app_loading_page.dart';
 import 'package:auth_firebase_app/app/auth_service.dart';
 import 'package:auth_firebase_app/app/welcomePage.dart';
-import 'package:auth_firebase_app/main.dart';
 import 'package:flutter/material.dart';
 
 class AuthLayout extends StatelessWidget {

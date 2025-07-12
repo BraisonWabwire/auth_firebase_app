@@ -1,15 +1,106 @@
 import 'package:auth_firebase_app/app/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // For timestamps
 
-class AppNavigationLayout extends StatelessWidget {
+class AppNavigationLayout extends StatefulWidget {
   const AppNavigationLayout({super.key});
 
   @override
+  State<AppNavigationLayout> createState() => _AppNavigationLayoutState();
+}
+
+class _AppNavigationLayoutState extends State<AppNavigationLayout>
+    with TickerProviderStateMixin { // Changed to TickerProviderStateMixin
+  final _messageController = TextEditingController();
+  final List<Map<String, dynamic>> _messages = [];
+  bool _isBotTyping = false;
+  late AnimationController _typingAnimationController;
+  late AnimationController _sendButtonAnimationController;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize animation controller for typing indicator
+    _typingAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    // Initialize animation controller for send button
+    _sendButtonAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+
+    // Add initial bot message
+    final user = authService.value.currentUser;
+    _messages.add({
+      'text': 'Hello${user?.email != null ? ', ${user!.email}' : ''}! How can I assist you today?',
+      'isUser': false,
+      'timestamp': DateTime.now(),
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _typingAnimationController.dispose();
+    _sendButtonAnimationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage() {
+    if (_messageController.text.trim().isEmpty) return;
+
+    setState(() {
+      _messages.add({
+        'text': _messageController.text.trim(),
+        'isUser': true,
+        'timestamp': DateTime.now(),
+      });
+      _isBotTyping = true;
+    });
+
+    _messageController.clear();
+    _scrollToBottom();
+
+    // Simulate bot response after a delay
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'text': 'Thanks for your message! I’m a demo bot, so I’ll just echo: "${_messages.last['text']}"',
+            'isUser': false,
+            'timestamp': DateTime.now(),
+          });
+          _isBotTyping = false;
+        });
+        _scrollToBottom();
+      }
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final user = authService.value.currentUser; // Access currentUser from AuthService
+    final user = authService.value.currentUser;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home'),
+        title: const Text('Chatbot'),
+        elevation: 2,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -25,24 +116,44 @@ class AppNavigationLayout extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade100, Colors.white],
+          ),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Welcome${user?.email != null ? ', ${user!.email}' : ''}!',
-              style: const TextStyle(fontSize: 24),
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16.0),
+                itemCount: _messages.length + (_isBotTyping ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (_isBotTyping && index == _messages.length) {
+                    return _buildTypingIndicator();
+                  }
+                  final message = _messages[index];
+                  return _buildMessageBubble(
+                    message['text'],
+                    message['isUser'],
+                    message['timestamp'],
+                    index,
+                  );
+                },
+              ),
             ),
-            const SizedBox(height: 20),
-            const Text('You are signed in.'),
+            _buildInputArea(),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.chat),
+            label: 'Chat',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
@@ -50,9 +161,156 @@ class AppNavigationLayout extends StatelessWidget {
           ),
         ],
         currentIndex: 0,
+        selectedItemColor: Colors.blue,
         onTap: (index) {
-          // Add navigation logic here (e.g., switch to Profile page)
+          if (index == 1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile page not implemented yet')),
+            );
+          }
         },
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(
+      String text, bool isUser, DateTime timestamp, int index) {
+    // Create a unique AnimationController for each message
+    final animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animationController,
+        curve: Curves.easeIn,
+      ),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset(isUser ? 1.0 : -1.0, 0.0),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: animationController,
+            curve: Curves.easeOut,
+          ),
+        ),
+        child: Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4.0),
+            padding: const EdgeInsets.all(12.0),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.7,
+            ),
+            decoration: BoxDecoration(
+              color: isUser ? Colors.blue.shade400 : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4.0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: isUser ? Colors.white : Colors.black87,
+                    fontSize: 16.0,
+                  ),
+                ),
+                const SizedBox(height: 4.0),
+                Text(
+                  DateFormat('HH:mm').format(timestamp),
+                  style: TextStyle(
+                    color: isUser ? Colors.white70 : Colors.black54,
+                    fontSize: 12.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FadeTransition(
+              opacity: _typingAnimationController,
+              child: const Text(
+                '• • •',
+                style: TextStyle(fontSize: 16.0, color: Colors.black54),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                hintText: 'Type a message...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 10.0,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          ScaleTransition(
+            scale: Tween<double>(begin: 1.0, end: 0.9).animate(
+              CurvedAnimation(
+                parent: _sendButtonAnimationController,
+                curve: Curves.easeInOut,
+              ),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.blue),
+              onPressed: () {
+                _sendButtonAnimationController.forward().then((_) {
+                  _sendButtonAnimationController.reverse();
+                  _sendMessage();
+                });
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
